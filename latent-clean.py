@@ -10,24 +10,25 @@ from datetime import datetime
 
 import requests
 
-TOKEN = "put your token here"
-USER_ID = ""
+TOKEN = "put your self token here"
+USER_ID = "your user id"
 
 WHITELIST_CHANNELS = []
 WHITELIST_USERS = []
 
-DRY_RUN = True
+DRY_RUN = False
 OLDER_THAN_DAYS = 0
-WORKERS = 5
+WORKERS = 3
 
 API = "https://discord.com/api/v10"
 DELETABLE_TYPES = {0, 19, 20, 23}
 DISCORD_EPOCH = 1420070400000
 MAX_RETRIES = 8
-TIMEOUT = 15
+TIMEOUT = 8
 LOG_FILE = "latent_clean_log.txt"
 FAILED_FILE = "latent_clean_failed.txt"
 CHECKPOINT_FILE = "latent_clean_checkpoint.json"
+CHECKPOINT_EVERY = 500
 
 CODES = {"reset": "\033[0m", "bold": "\033[1m", "dim": "\033[2m", "red": "\033[91m",
          "green": "\033[92m", "yellow": "\033[93m", "cyan": "\033[96m"}
@@ -86,7 +87,10 @@ def header():
 
 
 def ask(prompt="> "):
-    return input("  " + paint(prompt, "cyan", "bold")).strip()
+    try:
+        return input("  " + paint(prompt, "cyan", "bold")).strip()
+    except EOFError:
+        return ""
 
 
 def api(method, path, **kwargs):
@@ -100,7 +104,7 @@ def api(method, path, **kwargs):
         try:
             response = session.request(method, API + path, timeout=TIMEOUT, **kwargs)
         except requests.RequestException:
-            time.sleep(2 * (attempt + 1))
+            time.sleep(min(2 * (attempt + 1), 10))
             continue
         if response.status_code == 429:
             try:
@@ -116,20 +120,28 @@ def api(method, path, **kwargs):
             time.sleep(retry + 0.3)
             continue
         if response.status_code == 401:
+            log("Token invalid or expired (401)", "error")
             stop.set()
+            return None
         return response
     return None
 
 
 def snowflake_time(snowflake):
-    return ((int(snowflake) >> 22) + DISCORD_EPOCH) / 1000
+    try:
+        return ((int(snowflake) >> 22) + DISCORD_EPOCH) / 1000
+    except (TypeError, ValueError):
+        return 0
 
 
 def save_state():
     with lock:
-        data = {"stats": dict(stats), "failed": list(failed),
-                "done_channels": sorted(done_channels),
-                "timestamp": datetime.now().isoformat()}
+        data = {
+            "stats": dict(stats),
+            "failed": list(failed),
+            "done_channels": sorted(done_channels),
+            "timestamp": datetime.now().isoformat()
+        }
     try:
         with open(CHECKPOINT_FILE, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2)
@@ -148,9 +160,14 @@ def fetch_own_messages(channel_id):
         if before:
             params["before"] = before
         response = api("GET", f"/channels/{channel_id}/messages", params=params)
-        if response is None or response.status_code != 200:
-            if response is not None and response.status_code in (403, 404):
+        if response is None:
+            log(f"Channel {channel_id}: api returned None", "error")
+            break
+        if response.status_code != 200:
+            if response.status_code in (403, 404):
                 log(f"No access to channel ({response.status_code})", "error")
+            else:
+                log(f"Channel {channel_id}: HTTP {response.status_code}", "error")
             break
         batch = response.json()
         if not batch:
@@ -182,6 +199,8 @@ def delete_message(channel_id, message_id):
         return "deleted"
     if response.status_code == 404:
         return "gone"
+    if response.status_code == 403:
+        return "forbidden"
     return f"http_{response.status_code}"
 
 
@@ -195,13 +214,16 @@ def channel_name(channel):
     return "#" + str(channel.get("name", "unnamed"))
 
 
-def progress(done, total, ok, bad, started):
+def progress(done, total, ok, bad, started, skipped=0):
+    if total <= 0:
+        return
     width = 24
     filled = int(width * done / total)
     rate = done / max(0.1, time.time() - started)
     bar = paint("█" * filled, "green") + paint("░" * (width - filled), "dim")
+    skip_txt = f"  {paint(skipped, 'yellow')} skip" if skipped else ""
     sys.stdout.write(f"\r  {bar}  {int(100 * done / total):3d}%  {done}/{total}  "
-                     f"{paint(ok, 'green')} ok  {paint(bad, 'red')} failed  {rate:.1f}/s  ")
+                     f"{paint(ok, 'green')} ok  {paint(bad, 'red')} failed{skip_txt}  {rate:.1f}/s  ")
     sys.stdout.flush()
 
 
@@ -209,19 +231,22 @@ def clean_channel(channel_id):
     channel_id = str(channel_id)
     if stop.is_set():
         return
-    if channel_id in done_channels:
-        log(f"{channel_id} already done", "skip")
-        return
+
     if channel_id in {str(x) for x in WHITELIST_CHANNELS}:
         log(f"{channel_id} is whitelisted", "skip")
         with lock:
             stats["skipped"] += 1
         return
 
+    with lock:
+        if channel_id in done_channels:
+            log(f"{channel_id} already done", "skip")
+            return
+
     response = api("GET", f"/channels/{channel_id}")
     info = response.json() if response is not None and response.status_code == 200 else None
     blocked = {str(x) for x in WHITELIST_USERS}
-    if info and any(str(u.get("id")) in blocked for u in info.get("recipients", [])):
+    if info and info.get("type") in (1, 3) and any(str(u.get("id")) in blocked for u in info.get("recipients", [])):
         log(f"{channel_name(info)} is whitelisted", "skip")
         with lock:
             stats["skipped"] += 1
@@ -231,18 +256,22 @@ def clean_channel(channel_id):
     ids = fetch_own_messages(channel_id)
     with lock:
         stats["found"] += len(ids)
+
     if not ids:
         with lock:
             stats["channels"] += 1
-        done_channels.add(channel_id)
+            done_channels.add(channel_id)
         log("nothing to delete", "skip")
+        save_state()
         return
 
     if settings["dry"]:
         log(f"{paint(len(ids), 'yellow')} messages would be deleted (dry run)", "ok")
+        with lock:
+            done_channels.add(channel_id)
         return
 
-    ok = bad = count = 0
+    ok = bad = skip = count = 0
     started = time.time()
     with concurrent.futures.ThreadPoolExecutor(max_workers=settings["workers"]) as pool:
         futures = {pool.submit(delete_message, channel_id, mid): mid for mid in ids}
@@ -257,24 +286,30 @@ def clean_channel(channel_id):
                 ok += 1
                 with lock:
                     stats["deleted"] += 1
+            elif status == "forbidden":
+                skip += 1
+                with lock:
+                    stats["skipped"] += 1
             else:
                 bad += 1
                 with lock:
                     stats["failed"] += 1
                     failed.append({"channel_id": channel_id, "message_id": mid})
-            progress(count, len(ids), ok, bad, started)
-            if count % 50 == 0:
+            progress(count, len(ids), ok, bad, started, skip)
+            if count % CHECKPOINT_EVERY == 0:
                 save_state()
             if stop.is_set():
-                pool.shutdown(wait=False, cancel_futures=True)
+                try:
+                    pool.shutdown(wait=False, cancel_futures=True)
+                except TypeError:
+                    pool.shutdown(wait=False)
                 break
     print()
 
     with lock:
         stats["channels"] += 1
-    if not stop.is_set():
         done_channels.add(channel_id)
-    log(f"{ok} deleted, {bad} failed", "ok")
+    log(f"{ok} deleted, {bad} failed, {skip} skipped", "ok")
     save_state()
 
 
@@ -282,26 +317,47 @@ def retry_failed():
     with lock:
         items = list(failed)
         failed.clear()
+        stats["failed"] = 0
     if not items:
         log("no failed messages", "warn")
+        save_state()
         return
     log(f"retrying {len(items)} messages")
-    ok = 0
+    ok = bad = skip = count = 0
     started = time.time()
-    for index, item in enumerate(items, 1):
-        if stop.is_set():
-            failed.append(item)
-            continue
-        status = delete_message(item["channel_id"], item["message_id"])
-        if status in ("deleted", "gone"):
-            ok += 1
-            with lock:
-                stats["deleted"] += 1
-        elif status != "http_403":
-            failed.append(item)
-        progress(index, len(items), ok, index - ok, started)
+    with concurrent.futures.ThreadPoolExecutor(max_workers=settings["workers"]) as pool:
+        futures = {pool.submit(delete_message, item["channel_id"], item["message_id"]): item for item in items}
+        for future in concurrent.futures.as_completed(futures):
+            item = futures[future]
+            count += 1
+            try:
+                status = future.result()
+            except Exception:
+                status = "error"
+            if status in ("deleted", "gone"):
+                ok += 1
+                with lock:
+                    stats["deleted"] += 1
+            elif status == "forbidden":
+                skip += 1
+                with lock:
+                    stats["skipped"] += 1
+            else:
+                bad += 1
+                with lock:
+                    stats["failed"] += 1
+                    failed.append(item)
+            progress(count, len(items), ok, bad, started, skip)
+            if count % CHECKPOINT_EVERY == 0:
+                save_state()
+            if stop.is_set():
+                try:
+                    pool.shutdown(wait=False, cancel_futures=True)
+                except TypeError:
+                    pool.shutdown(wait=False)
+                break
     print()
-    log(f"{ok}/{len(items)} deleted", "ok")
+    log(f"{ok}/{len(items)} deleted, {bad} failed, {skip} skipped", "ok")
     save_state()
 
 
@@ -343,8 +399,9 @@ def load_checkpoint():
         if answer.lower() == "y":
             done_channels.update(data.get("done_channels", []))
             failed.extend(data.get("failed", []))
-            for key in ("deleted", "failed", "found", "channels"):
+            for key in ("deleted", "found", "channels", "skipped", "rate_limits"):
                 stats[key] = data["stats"].get(key, 0)
+            stats["failed"] = len(failed)
     except (OSError, ValueError, KeyError):
         pass
 
@@ -367,7 +424,7 @@ def settings_menu():
             value = ask("Threads (1-10): ")
             if value.isdigit():
                 settings["workers"] = max(1, min(10, int(value)))
-        else:
+        elif choice == "0":
             return
 
 
@@ -412,12 +469,15 @@ def main():
         fail_screen("Login failed. Your token may be invalid.")
         return
     me = response.json()
-    USER_ID = str(USER_ID or me["id"])
+    USER_ID = str(me["id"])
     account["name"] = me.get("username", "?")
     account["id"] = USER_ID
 
     if os.path.exists(LOG_FILE):
-        os.remove(LOG_FILE)
+        try:
+            os.remove(LOG_FILE)
+        except OSError:
+            pass
     header()
     print()
     load_checkpoint()
