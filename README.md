@@ -47,7 +47,7 @@ pip install requests
 Open the script and configure:
 
 ```python
-TOKEN = "YOUR_TOKEN_HERE"
+TOKEN = "put your token here"
 
 WHITELIST_CHANNELS = []
 WHITELIST_USERS = []
