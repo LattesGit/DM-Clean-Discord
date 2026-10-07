@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+.env
+latent_clean_log.txt
+latent_clean_failed.txt
+latent_clean_checkpoint.json
