@@ -1,15 +1,13 @@
 # LATENT CLEAN
 
 [![Python](https://img.shields.io/badge/Python-3.9%2B-3776AB?style=flat-square\&logo=python\&logoColor=white)](https://www.python.org/)
-[![Discord](https://img.shields.io/badge/Discord-API-5865F2?style=flat-square\&logo=discord\&logoColor=white)](https://discord.com/developers/docs/intro)
-[![License](https://img.shields.io/badge/License-MIT-2ea44f?style=flat-square)](LICENSE)
-[![Status](https://img.shields.io/badge/Status-Active-2ea44f?style=flat-square)]()
+[![Discord API](https://img.shields.io/badge/Discord-API-5865F2?style=flat-square\&logo=discord\&logoColor=white)](https://discord.com/developers/docs/intro)
+[![License](https://img.shields.io/github/license/LattesGit/DM-Clean-Discord?style=flat-square)](https://github.com/LattesGit/DM-Clean-Discord/blob/main/LICENSE)
+[![Status](https://img.shields.io/badge/Status-Active-2ea44f?style=flat-square)](https://github.com/LattesGit/DM-Clean-Discord)
 
-**Discord message cleanup utility built with Python.**
+A command-line Discord message cleanup utility written in Python.
 
-LATENT CLEAN is a CLI tool for cleaning messages from Discord channels, DMs and servers through the Discord API.
-
-Built for controlled cleanup with dry runs, filtering, whitelists, concurrent deletion, rate limit handling, retries and recovery.
+LATENT CLEAN is designed for controlled message cleanup across Discord channels, DMs, and servers, with filtering, dry-run support, rate-limit handling, retries, checkpoints, and recovery features.
 
 ## Features
 
@@ -22,38 +20,46 @@ Built for controlled cleanup with dry runs, filtering, whitelists, concurrent de
 * User whitelists
 * Dry-run mode
 * Concurrent deletion
-* Rate-limit handling
+* Discord rate-limit handling
 * Automatic retries
 * Failed deletion recovery
-* Checkpoint system
-* Live progress
+* Checkpoint-based recovery
+* Live progress tracking
 * Runtime statistics
 * Configurable workers
-* Message type handling
+* Message type filtering
 * Interrupted-operation recovery
 
 ## Requirements
 
-* Python 3.9+
+* Python 3.9 or newer
 * `requests`
-* Discord account authentication token
+* A Discord authentication token for an account you are authorized to manage
 
 Install the dependency:
 
 ```bash
-pip install requests
+pip install -r requirements.txt
 ```
 
-## Setup
+## Installation
 
 Clone the repository:
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/LATENT-CLEAN.git
-cd LATENT-CLEAN
+git clone https://github.com/LattesGit/DM-Clean-Discord.git
+cd DM-Clean-Discord
 ```
 
-Configure `main.py`:
+Install dependencies:
+
+```bash
+pip install -r requirements.txt
+```
+
+## Configuration
+
+Configure the values in `main.py`:
 
 ```python
 TOKEN = "your_token_here"
@@ -66,24 +72,24 @@ OLDER_THAN_DAYS = 0
 WORKERS = 5
 ```
 
-Run:
+Run the program:
 
 ```bash
 python3 main.py
 ```
 
-## Configuration
+## Configuration Options
 
-| Option               | Description                                   |
-| -------------------- | --------------------------------------------- |
-| `TOKEN`              | Discord authentication token                  |
-| `WHITELIST_CHANNELS` | Channels excluded from cleanup                |
-| `WHITELIST_USERS`    | Users whose messages are excluded             |
-| `DRY_RUN`            | Scan without deleting messages                |
-| `OLDER_THAN_DAYS`    | Process messages older than the specified age |
-| `WORKERS`            | Number of concurrent deletion workers         |
+| Option               | Description                                                   |
+| -------------------- | ------------------------------------------------------------- |
+| `TOKEN`              | Discord authentication token                                  |
+| `WHITELIST_CHANNELS` | Channel IDs excluded from cleanup                             |
+| `WHITELIST_USERS`    | User IDs whose messages are excluded                          |
+| `DRY_RUN`            | Preview deletions without modifying messages                  |
+| `OLDER_THAN_DAYS`    | Only process messages older than the specified number of days |
+| `WORKERS`            | Number of concurrent workers                                  |
 
-### Dry Run
+## Dry Run
 
 Dry-run mode is enabled by default:
 
@@ -91,29 +97,33 @@ Dry-run mode is enabled by default:
 DRY_RUN = True
 ```
 
-LATENT CLEAN scans the selected locations and shows what would be deleted without modifying messages.
+When enabled, LATENT CLEAN scans the selected targets and reports messages that would be removed without performing deletions.
 
-Live deletion should only be enabled after checking the selected targets and filters.
+It is recommended to review the dry-run results before enabling live deletion.
 
-### Age Filter
+## Age Filtering
 
-Only process messages older than 30 days:
+To process only messages older than 30 days:
 
 ```python
 OLDER_THAN_DAYS = 30
 ```
 
-Set the value to `0` to disable the filter.
+Set the value to `0` to disable age filtering:
 
-### Workers
+```python
+OLDER_THAN_DAYS = 0
+```
 
-Configure concurrent deletion workers:
+## Workers
+
+The number of concurrent workers can be configured with:
 
 ```python
 WORKERS = 5
 ```
 
-The worker count affects request concurrency but does not bypass Discord API rate limits.
+Increasing the worker count can improve throughput, but it does **not** bypass Discord API rate limits.
 
 ## Menu
 
@@ -130,25 +140,33 @@ The worker count affects request concurrency but does not bypass Discord API rat
 
 ## Rate Limits
 
-LATENT CLEAN handles Discord API rate limits automatically.
+LATENT CLEAN handles Discord API rate-limit responses automatically.
 
-When Discord responds with `429 Too Many Requests`, the program reads the provided retry interval and waits before continuing.
+When Discord returns:
 
-Global rate limits are handled as well.
+```text
+429 Too Many Requests
+```
+
+the program uses the server-provided retry interval before continuing.
+
+Global rate-limit responses are handled as well.
 
 ## Failed Deletions
 
-Failed deletions are stored locally:
+Failed deletion attempts are stored locally in:
 
 ```text
 latent_clean_failed.txt
 ```
 
-They can be retried without restarting the entire cleanup operation.
+Failed operations can later be retried from the menu:
 
 ```text
 5. Retry failed
 ```
+
+This avoids having to restart the entire cleanup operation.
 
 ## Checkpoints
 
@@ -158,42 +176,48 @@ Long-running operations maintain a local checkpoint:
 latent_clean_checkpoint.json
 ```
 
-The checkpoint stores progress information so interrupted operations can be recovered.
+The checkpoint stores operation progress and allows interrupted tasks to resume from their previous state.
 
 ## Runtime Files
 
-| File                           | Purpose                 |
-| ------------------------------ | ----------------------- |
-| `latent_clean_log.txt`         | Runtime logs            |
-| `latent_clean_failed.txt`      | Failed deletion records |
-| `latent_clean_checkpoint.json` | Recovery state          |
+| File                           | Purpose                     |
+| ------------------------------ | --------------------------- |
+| `latent_clean_log.txt`         | Runtime and error logs      |
+| `latent_clean_failed.txt`      | Failed deletion records     |
+| `latent_clean_checkpoint.json` | Recovery and progress state |
 
-These files are created automatically during execution.
+These files are generated automatically while the program is running.
 
 ## Security
 
-Your Discord authentication token is highly sensitive.
+Discord authentication tokens are highly sensitive credentials.
 
-Never commit it to GitHub or share it publicly.
+**Never commit a real token to GitHub or share it with anyone.**
+
+Example:
 
 ```python
 TOKEN = "your_token_here"
 ```
 
-If a real token has been exposed, invalidate it immediately and generate a new one.
+If a real token has been exposed, revoke it immediately and obtain a new credential.
 
-## Disclaimer
+For additional safety, make sure generated runtime files containing sensitive information are excluded from version control.
 
-LATENT CLEAN uses a Discord user account authentication token rather than a standard Discord bot account.
+## Important Notice
 
-Automating user accounts may violate Discord's Terms of Service. Use this project only with accounts and data you are authorized to manage.
+LATENT CLEAN is designed around Discord user-account authentication rather than a standard Discord bot account.
 
-The author is not responsible for account restrictions, deleted data or other consequences resulting from the use of this software.
+Automating user accounts, including self-bot behavior, may violate Discord's Terms of Service and can result in account restrictions or termination.
+
+Only use this software with accounts, servers, channels, and messages that you are authorized to manage.
+
+The author is not responsible for account restrictions, data loss, deleted messages, or other consequences resulting from the use of this software.
 
 ## Project Structure
 
 ```text
-LATENT CLEAN/
+DM-Clean-Discord/
 ├── main.py
 ├── requirements.txt
 ├── LICENSE
@@ -202,6 +226,6 @@ LATENT CLEAN/
 
 ## License
 
-MIT License
+This project is licensed under the MIT License.
 
-See [`LICENSE`](LICENSE) for details.
+See [`LICENSE`](LICENSE) for the full license text.
