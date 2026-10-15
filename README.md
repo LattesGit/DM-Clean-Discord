@@ -1,80 +1,123 @@
 # LATENT CLEAN
 
+**Discord Message Management CLI**
+
 [![Python](https://img.shields.io/badge/Python-3.9%2B-3776AB?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
-[![Discord API](https://img.shields.io/badge/Discord-API-5865F2?style=flat-square&logo=discord&logoColor=white)](https://discord.com/developers/docs/intro)
-[![License](https://img.shields.io/github/license/LattesGit/DM-Clean-Discord?style=flat-square)](https://github.com/LattesGit/DM-Clean-Discord/blob/main/LICENSE)
-[![Status](https://img.shields.io/badge/Status-Active-2ea44f?style=flat-square)](https://github.com/LattesGit/DM-Clean-Discord)
+[![Discord](https://img.shields.io/badge/Platform-Discord-5865F2?style=flat-square&logo=discord&logoColor=white)](https://discord.com/)
+[![License](https://img.shields.io/github/license/LattesGit/DM-Clean-Discord?style=flat-square)](LICENSE)
+[![Repository](https://img.shields.io/badge/Interface-CLI-30363D?style=flat-square&logo=gnubash&logoColor=white)](https://github.com/LattesGit/DM-Clean-Discord)
 
-A fast command-line utility that deletes **your own** Discord messages across channels, DMs and servers. It runs as an interactive menu or fully scripted through command-line flags.
+A command-line utility for reviewing and managing your own Discord messages with filtering, progress tracking, checkpoints, and configurable execution options.
 
-> **Read the [Important Notice](#important-notice) before using this tool.**
+LATENT CLEAN provides an interactive menu and command-line interface, with a dry-run mode intended to help you review an operation before making changes.
+
+> [!CAUTION]
+> **Read the Security and Compatibility Notice before using this project.**
+>
+> This project describes user-account automation. Automating normal user accounts (self-botting) is prohibited by Discord's Terms of Service and may result in account restrictions or termination. This README does not imply that the project is officially supported by Discord.
+
+---
+
+## Contents
+
+- [Features](#features)
+- [Requirements](#requirements)
+- [Installation](#installation)
+- [Configuration](#configuration)
+- [Usage](#usage)
+- [Command-Line Options](#command-line-options)
+- [Filtering and Execution](#filtering-and-execution)
+- [Rate Limits and Reliability](#rate-limits-and-reliability)
+- [Runtime Files](#runtime-files)
+- [Security and Compatibility Notice](#security-and-compatibility-notice)
+- [Troubleshooting](#troubleshooting)
+- [Project Structure](#project-structure)
+- [Contributing](#contributing)
+- [License](#license)
 
 ## Features
 
-* Clean channels, all DMs / group DMs, one server, or every server
-* **Dry run is the default** – nothing is deleted until you pass `--live`
-* Proactive per-route rate-limit handling (reads Discord's headers, so far fewer `429`s)
-* Automatic retries for network errors, `429` and `5xx`
-* Filters: message age, keyword, keep pinned messages
-* Channel and user whitelists
-* Concurrent deletion with live progress bar and ETA
-* Checkpoints and a failed-message list, so interrupted runs can be resumed
-* Clean `Ctrl+C` shutdown
-* Token is read from an environment variable / `.env` file, never hardcoded
+- **Interactive CLI** — navigate operations through a menu.
+- **Command-line execution** — configure supported operations using flags.
+- **Dry-run mode** — preview intended operations before execution.
+- **Filtering** — filter by message age and keyword.
+- **Pinned-message protection** — optionally exclude pinned messages.
+- **Channel and user exclusions** — configure skip lists.
+- **Progress tracking** — display progress and estimated completion time.
+- **Checkpoint support** — preserve progress for supported interrupted operations.
+- **Retry support** — review and retry recorded failures.
+- **Rate-limit awareness** — respect server-provided rate-limit information.
+- **Error handling** — handle supported network errors and transient server failures.
+- **Environment-based configuration** — keep credentials out of source files.
+- **Interrupt handling** — handle Ctrl+C during execution.
+
+> Feature availability and behavior depend on the implementation in the current version of `main.py`. Verify each option before relying on it.
+
+## Requirements
+
+- Python 3.9 or newer
+- Git
+- Internet connectivity
+- Dependencies listed in `requirements.txt`
 
 ## Installation
+
+Clone the repository and install its dependencies:
 
 ```bash
 git clone https://github.com/LattesGit/DM-Clean-Discord.git
 cd DM-Clean-Discord
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
-Requires Python 3.9+.
+On Windows, activate the virtual environment with:
 
-## Setting your token
+```powershell
+.venv\Scripts\Activate.ps1
+```
 
-The tool looks for the token in this order:
+Verify the Python version:
 
-1. The `DISCORD_TOKEN` environment variable
-2. A `.env` file in the project folder
-3. A hidden prompt when you start the program
+```bash
+python --version
+```
 
-Easiest setup:
+## Configuration
+
+LATENT CLEAN documents environment-based configuration for supported settings.
+
+Create a local environment file if the project provides `.env.example`:
 
 ```bash
 cp .env.example .env
-# then open .env and paste your token after DISCORD_TOKEN=
 ```
 
-`.env` is already listed in `.gitignore`, so it will not be committed.
+Keep `.env` local and make sure it is excluded by `.gitignore`.
 
-### How to get your token
+### Credential safety
 
-Your user token is the `authorization` header your own browser sends to Discord. To read it from your own account:
+- Never commit credentials, session tokens, or `.env` files.
+- Never share authentication headers in screenshots, issue reports, or logs.
+- Do not use tokens obtained from another person's browser or account.
+- Do not assume that storing a token in `.env` makes an unsupported authentication method safe or compliant.
+- If a credential may have been exposed, secure the affected account and follow the provider's current credential-revocation guidance.
 
-1. Open **https://discord.com/app** in a desktop browser (Chrome, Edge or Firefox) and log in.
-2. Press **F12** to open Developer Tools and go to the **Network** tab.
-3. Type `api` into the filter box.
-4. Click any channel or send a reaction so that new requests appear.
-5. Click one of the requests to `discord.com/api/...`.
-6. Under **Headers → Request Headers**, find `authorization`. The value is your token.
-7. Paste it into your `.env` file.
-
-**Treat the token like a password.**
-
-* Anyone who has it has full access to your account, including without your password or 2FA.
-* Never paste it into chats, issues, screenshots or commits. Nobody legitimate will ever ask you for it.
-* If it leaks, **change your Discord password** – this invalidates the old token.
-* Logging out of Discord in that browser also invalidates it, so copy a fresh one if the tool reports `401`.
+**Important:** Environment-variable support is a configuration mechanism, not an endorsement of user-token automation. Prefer official, documented Discord API authentication and supported bot functionality.
 
 ## Usage
 
 ### Interactive menu
 
+Start the application:
+
 ```bash
 python3 main.py
 ```
+
+The documented menu includes the following entries:
 
 ```text
 1. Clean channels by ID
@@ -87,69 +130,153 @@ python3 main.py
 0. Exit
 ```
 
-### Command line
+Menu options may vary by version. Consult the source code if an entry behaves differently.
 
-Always start with a dry run to see what would be removed, then add `--live`.
+### Command-line interface
+
+Use the built-in help output to inspect the options supported by your installed version:
 
 ```bash
-# preview everything in all DMs
-python3 main.py --dm
-
-# delete your messages in two channels
-python3 main.py -c 123456789012345678 234567890123456789 --live
-
-# one server, only messages older than 30 days, keep pinned, skip a channel
-python3 main.py -g 345678901234567890 --older-than 30 --keep-pinned \
-    --skip-channel 456789012345678901 --live
-
-# all DMs except conversations with one person, no confirmation prompt
-python3 main.py --dm --skip-user 567890123456789012 --live --yes
-
-# continue an interrupted run
-python3 main.py --dm --live --resume
+python3 main.py --help
 ```
 
-| Flag | Description |
-| ---- | ----------- |
-| `-c, --channel ID...` | Clean these channel IDs |
-| `--dm` | Clean all DMs and group DMs |
-| `-g, --guild ID...` | Clean these server IDs |
-| `--all-guilds` | Clean every server you are in |
-| `--live` | Actually delete (default is dry run) |
-| `--older-than DAYS` | Only messages older than N days |
-| `--keyword TEXT` | Only messages containing TEXT |
-| `--keep-pinned` | Never delete pinned messages |
-| `-w, --workers N` | Delete workers, 1–10 (default 3) |
-| `--skip-channel ID...` | Channels to skip |
-| `--skip-user ID...` | Skip DMs with these users |
-| `--resume` | Resume from the last checkpoint |
-| `-y, --yes` | Skip the `YES` confirmation |
+If the implementation supports dry-run previews, use them first to inspect the intended scope and filtering rules.
 
-Defaults can also be edited at the top of `main.py` (`DRY_RUN`, `OLDER_THAN_DAYS`, `WORKERS`, `WHITELIST_CHANNELS`, `WHITELIST_USERS`, ...).
+Examples of documented option combinations include:
 
-### Finding IDs
+```bash
+# Preview an operation targeting direct messages
+python3 main.py --dm
 
-Enable **Settings → Advanced → Developer Mode** in Discord, then right-click a channel, server or user and choose **Copy ID**.
+# Specify channel IDs
+python3 main.py -c CHANNEL_ID_1 CHANNEL_ID_2
 
-## Workers and rate limits
+# Inspect options for a specific server
+python3 main.py -g SERVER_ID
 
-More workers do **not** bypass Discord's rate limits – deletes are limited per channel. Values of 2–3 are usually the sweet spot. The tool reads Discord's rate-limit headers and waits before it gets blocked; if a `429` still happens it waits for the server-provided time.
+# Review available filtering options
+python3 main.py --help
+```
 
-## Runtime files
+Replace placeholders with IDs you are authorized to manage. These examples illustrate argument structure; they do not guarantee that the current implementation supports every combination or that Discord permits the underlying operation.
+
+## Command-Line Options
+
+The original project documents the following flags. Confirm their behavior with `python3 main.py --help` before use.
+
+| Option | Description |
+| --- | --- |
+| `-c, --channel ID...` | Select channel IDs |
+| `--dm` | Target direct-message conversations |
+| `-g, --guild ID...` | Select server IDs |
+| `--all-guilds` | Select all joined servers |
+| `--live` | Enable execution instead of preview mode |
+| `--older-than DAYS` | Filter by message age |
+| `--keyword TEXT` | Filter by message content |
+| `--keep-pinned` | Exclude pinned messages |
+| `-w, --workers N` | Configure worker count |
+| `--skip-channel ID...` | Exclude channel IDs |
+| `--skip-user ID...` | Exclude user IDs |
+| `--resume` | Resume supported interrupted operations |
+| `-y, --yes` | Skip the interactive confirmation prompt |
+
+The default behavior, valid argument ranges, and interaction between flags should be verified against the actual source code.
+
+## Filtering and Execution
+
+Before running any operation, review the following:
+
+1. **Scope:** Confirm the selected channels or conversations.
+2. **Filters:** Verify message-age and keyword filters.
+3. **Exclusions:** Review channel and user skip lists.
+4. **Preview:** Inspect the planned operation where dry-run support is available.
+5. **Recovery:** Understand the checkpoint and failure-record behavior.
+6. **Irreversibility:** Treat deletion as permanent unless the platform explicitly provides a recovery mechanism.
+
+A dry run is only as reliable as the implementation behind it. Verify that preview mode performs no destructive requests before trusting it.
+
+## Rate Limits and Reliability
+
+The project documents support for rate-limit handling, retry behavior, and configurable concurrency.
+
+Keep in mind:
+
+- Increasing worker counts does not remove server-enforced rate limits.
+- Retries should respect the server's retry instructions.
+- Network failures can leave operations partially completed.
+- Checkpoint files may not capture every possible failure state.
+- Re-running an operation should be preceded by a review of its current scope.
+
+Do not interpret a progress bar reaching 100% as proof that every requested operation succeeded. Review the final status and error records.
+
+## Runtime Files
+
+The project documents these local runtime files:
 
 | File | Purpose |
-| ---- | ------- |
-| `latent_clean_log.txt` | Runtime and error log |
-| `latent_clean_failed.txt` | Messages that could not be deleted (`channel_id,message_id`) |
-| `latent_clean_checkpoint.json` | Progress state used by `--resume` |
+| --- | --- |
+| `latent_clean_log.txt` | Runtime and error logging |
+| `latent_clean_failed.txt` | Records of failed operations |
+| `latent_clean_checkpoint.json` | Progress state for supported resume operations |
 
-All three are in `.gitignore`. Failed messages can be retried from the menu (`5. Retry failed`).
+These files may contain operational metadata. Inspect their contents before sharing them publicly, and ensure that sensitive values are not written to logs.
 
-## Important Notice
+The project lists these files in `.gitignore`; verify the actual ignore rules in your local checkout.
 
-LATENT CLEAN authenticates with a **user token**, not a bot token. Automating a user account ("self-botting") **violates Discord's Terms of Service** and can lead to account restrictions or termination. Use it at your own risk, preferably on an account you can afford to lose, and only on messages you are authorized to manage.
+## Security and Compatibility Notice
 
-Deleted messages cannot be recovered. The author is not responsible for account restrictions, data loss or any other consequences of using this software.
+LATENT CLEAN is an independent, community-maintained project and is not affiliated with, endorsed by, or supported by Discord.
+
+### Account automation
+
+Discord prohibits automating normal user accounts through self-bots. Using a user token to automate account actions can result in account restrictions or termination.
+
+For integrations, moderation tools, and message-management workflows, use the official Discord API and supported bot authentication wherever the intended operation is available.
+
+Official documentation:
+
+- [Discord Developer Documentation](https://discord.com/developers/docs/intro)
+- [Discord Developer Terms](https://discord.com/developers/docs/policies-and-agreements/developer-terms-of-service)
+- [Discord Community Guidelines](https://discord.com/guidelines)
+
+### Data loss
+
+Message deletion may be irreversible. The maintainers cannot guarantee that deleted messages can be recovered.
+
+Use the software only with accounts and data you are authorized to manage. Understand the platform's rules and the risks before executing any operation.
+
+## Troubleshooting
+
+### Dependency installation fails
+
+Update `pip` inside your virtual environment and reinstall the listed dependencies:
+
+```bash
+python -m pip install --upgrade pip
+pip install -r requirements.txt
+```
+
+### An option is not recognized
+
+Check the available arguments:
+
+```bash
+python3 main.py --help
+```
+
+Compare the output with the README for your checked-out version.
+
+### An operation fails partway through
+
+Review the runtime log and failure records. If the program supports resuming, inspect the checkpoint before attempting to continue.
+
+### Authentication or access errors
+
+Confirm that the configured authentication method is supported, that credentials have not expired, and that the requested operation is permitted. Do not attempt to bypass access controls or platform-enforced restrictions.
+
+### Unexpected deletion scope
+
+Stop execution, inspect the argument parsing and filtering logic, and test changes using a verified non-destructive preview before proceeding.
 
 ## Project Structure
 
@@ -163,6 +290,25 @@ DM-Clean-Discord/
 └── README.md
 ```
 
+Runtime files may be created when the application runs.
+
+## Contributing
+
+Contributions that improve maintainability, reliability, testing, documentation, and security are welcome.
+
+1. Fork the repository.
+2. Create a descriptive feature branch.
+3. Make a focused change.
+4. Test the change locally.
+5. Update the documentation when behavior changes.
+6. Submit a pull request describing the change and its limitations.
+
+Please avoid submitting credentials, session tokens, personal data, or unredacted runtime logs.
+
 ## License
 
-This project is licensed under the MIT License. See [`LICENSE`](LICENSE) for details.
+This project is distributed under the MIT License. See [`LICENSE`](LICENSE) for the full license text.
+
+---
+
+**LATENT CLEAN** focused tooling, explicit configuration, and transparent execution behavior.
